@@ -14,10 +14,17 @@ from config import (
     CIELO_CAPTURE_IMMEDIATELY_DONATION,
 )
 from utils import calc_installment_amount, BRL_to_cents
+from flask_cors import CORS
 
 
 app = Flask(__name__)
 app.secret_key = "change-this-in-production"
+cors_origins = os.environ.get("CORS_ORIGINS", "*")
+CORS(app, resources={r"/*": {"origins": cors_origins}})
+
+@app.context_processor
+def inject_static_base():
+    return {"static_base_url": os.environ.get("STATIC_BASE_URL")}
 
 
 # Catálogo de planos (valores informados pelo usuário)

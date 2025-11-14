@@ -4,7 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Centro de Consultoria Educacional</title>
+    {% if static_base_url %}
+    <link rel="stylesheet" href="{{ static_base_url }}/style.css">
+    {% else %}
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% endif %}
   </head>
   <body>
     <div class="nav">
