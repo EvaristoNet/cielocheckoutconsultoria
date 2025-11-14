@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="hero-card">
+    <h2 class="hero-title">Checkout da Doação</h2>
+    <p class="hero-sub">Contribuição simbólica de R$ 1,00 processada com segurança via Cielo.</p>
+  </div>
+
+  <div class="grid" style="margin-top:14px;">
+    <div class="card plan-card plan-neutral">
+      <strong>Doação</strong>
+      <div class="plan-price">Valor: R$ 1,00</div>
+      <div class="muted">Parcela: R$ 1,00 (1x)</div>
+    </div>
+
+    <div class="card">
+      <form method="post" action="{{ url_for('doar') }}" id="donation-checkout-form">
+        <label for="don_holder">Nome impresso no cartão</label>
+        <input type="text" id="don_holder" name="don_holder" autocomplete="cc-name" required>
+
+        <label for="don_brand">Bandeira</label>
+        <div class="brand-row">
+          <select id="don_brand" name="don_brand" required>
+            {% for b in card_brands %}
+              <option value="{{ b }}">{{ b }}</option>
+            {% endfor %}
+          </select>
+          <span id="don_brand_badge" class="brand-badge muted" aria-live="polite"></span>
+        </div>
+
+        <label for="don_card_number">Número do cartão</label>
+        <input type="text" id="don_card_number" name="don_card_number" inputmode="numeric" autocomplete="cc-number" required>
+
+        <label for="don_expiration">Validade (MM/AAAA)</label>
+        <input type="text" id="don_expiration" name="don_expiration" placeholder="MM/AAAA" inputmode="numeric" autocomplete="cc-exp" required>
+
+        <label for="don_cvv">CVV</label>
+        <input type="password" id="don_cvv" name="don_cvv" inputmode="numeric" autocomplete="cc-csc" required>
+
+        <button class="btn btn-primary" type="submit">Pagar R$ 1,00</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    const donBrandSelect = document.getElementById('don_brand');
+    const donBrandBadge = document.getElementById('don_brand_badge');
+    const donCardNumberInput = document.getElementById('don_card_number');
+    const donHolderInput = document.getElementById('don_holder');
+    const donCvvInput = document.getElementById('don_cvv');
+    const donExpInput = document.getElementById('don_expiration');
+
+    function detectBrand(num){
+      const n = num;
+      if (/^4/.test(n)) return 'Visa';
+      const two = parseInt(n.slice(0,2) || '0', 10);
+      const four = parseInt(n.slice(0,4) || '0', 10);
+      if ((two >= 51 && two <= 55) || (four >= 2221 && four <= 2720)) return 'Master';
+      if (/^3[47]/.test(n)) return 'Amex';
+      if (/^(606282|3841)/.test(n)) return 'Hipercard';
+      if (/^3(0[0-5]|6|8)/.test(n)) return 'Diners';
+      if (/^(6011|65|64[4-9]|622)/.test(n)) return 'Discover';
+      const eloBins = [/^(4011)/, /^(431274)/, /^(438935)/, /^(457393)/, /^(504175)/, /^(627780)/, /^(636297)/, /^(636368)/];
+      if (eloBins.some(r=>r.test(n))) return 'Elo';
+      return '';
+    }
+
+    function formatCardNumber(num, brand){
+      const digits = num.replace(/\D/g, '');
+      if (brand === 'Amex') {
+        return digits.replace(/^(\d{1,4})(\d{1,6})?(\d{1,5})?$/, (m, a, b, c) => [a, b, c].filter(Boolean).join(' '));
+      }
+      return digits.replace(/(\d{1,4})(?=\d)/g, '$1 ').trim();
+    }
+
+    function updateBrandUI(brand){
+      if (brand) {
+        donBrandSelect.value = brand;
+        donBrandBadge.textContent = `Bandeira: ${brand}`;
+      } else {
+        donBrandBadge.textContent = '';
+      }
+      // Ajusta CVV: Amex 4, demais 3
+      if (brand === 'Amex') {
+        donCvvInput.maxLength = 4;
+      } else {
+        donCvvInput.maxLength = 3;
+      }
+    }
+
+    donCardNumberInput.addEventListener('input', () => {
+      const raw = donCardNumberInput.value.replace(/\D/g, '');
+      const brand = detectBrand(raw);
+      const formatted = formatCardNumber(donCardNumberInput.value, brand);
+      donCardNumberInput.value = formatted;
+      updateBrandUI(brand);
+    });
+
+    donHolderInput.addEventListener('input', () => {
+      donHolderInput.value = donHolderInput.value.toUpperCase();
+    });
+
+    donCvvInput.addEventListener('input', () => {
+      donCvvInput.value = donCvvInput.value.replace(/\D/g, '');
+      if (donCvvInput.maxLength) {
+        donCvvInput.value = donCvvInput.value.slice(0, donCvvInput.maxLength);
+      }
+    });
+
+    donExpInput.addEventListener('input', () => {
+      let digits = donExpInput.value.replace(/\D/g, '');
+      if (digits.length > 6) digits = digits.slice(0, 6);
+      if (digits.length >= 3) {
+        donExpInput.value = `${digits.slice(0,2)}/${digits.slice(2)}`;
+      } else {
+        donExpInput.value = digits;
+      }
+    });
+  </script>
+{% endblock %}

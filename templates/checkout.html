@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="hero-card">
+    <h2 class="hero-title">Checkout do Plano</h2>
+    <p class="hero-sub">Revise o plano e conclua o pagamento com segurança.</p>
+  </div>
+
+  <div class="grid" style="margin-top:14px;">
+    <div class="card plan-card plan-neutral">
+      <strong>{{ plan.label }}</strong>
+      <div class="plan-price">Preço: R$ {{ '%.2f'|format(plan.price_brl) }}</div>
+      <div id="installment-value" class="muted">Parcela: R$ —</div>
+    </div>
+
+    <div class="card">
+      <form method="post" action="{{ url_for('pagar') }}" id="checkout-form">
+        <input type="hidden" name="plan_id" value="{{ plan.id }}">
+
+        <h3>Dados do cliente</h3>
+        <label for="phone">Telefone</label>
+        <input type="text" id="phone" name="phone" placeholder="(DDD) 99999-9999" required>
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="seuemail@dominio.com" required>
+
+        <label for="cep">CEP</label>
+        <input type="text" id="cep" name="cep" placeholder="00000-000" required>
+
+        <label for="cpf">CPF</label>
+        <input type="text" id="cpf" name="cpf" placeholder="000.000.000-00" required>
+
+        <label for="installments">Parcelas (1 a {{ max_installments }}):</label>
+        <select name="installments" id="installments">
+          {% for n in range(1, max_installments + 1) %}
+            <option value="{{ n }}">{{ n }}x</option>
+          {% endfor %}
+        </select>
+
+        <h3>Dados do cartão</h3>
+        <label for="holder">Nome impresso no cartão</label>
+        <input type="text" id="holder" name="holder" required>
+
+        <label for="brand">Bandeira</label>
+        <div class="brand-row">
+          <select id="brand" name="brand" required>
+            {% for b in card_brands %}
+              <option value="{{ b }}">{{ b }}</option>
+            {% endfor %}
+          </select>
+          <span id="brand-badge" class="brand-badge muted" aria-live="polite"></span>
+        </div>
+
+        <label for="card_number">Número do cartão</label>
+        <input type="text" id="card_number" name="card_number" inputmode="numeric" autocomplete="cc-number" required>
+
+        <label for="expiration">Validade (MM/AAAA)</label>
+        <input type="text" id="expiration" name="expiration" placeholder="MM/AAAA" inputmode="numeric" autocomplete="cc-exp" required>
+
+        <label for="cvv">CVV</label>
+        <input type="password" id="cvv" name="cvv" inputmode="numeric" autocomplete="cc-csc" required>
+
+        <button class="btn btn-primary" type="submit">Pagar</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const plan = {{ plan|tojson }};
+    const monthlyRate = {{ monthly_interest_rate }};
+    const installmentsSelect = document.getElementById('installments');
+    const installmentValueDiv = document.getElementById('installment-value');
+    const brandSelect = document.getElementById('brand');
+    const brandBadge = document.getElementById('brand-badge');
+    const cardNumberInput = document.getElementById('card_number');
+    const holderInput = document.getElementById('holder');
+    const cvvInput = document.getElementById('cvv');
+    const expInput = document.getElementById('expiration');
+
+    function formatBRL(value){
+      return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function calcInstallment(principal, rate, n){
+      if (n <= 1 || rate <= 0) return principal;
+      const i = rate;
+      const factor = (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
+      return principal * factor;
+    }
+
+    function updateInstallmentInfo(){
+      const n = parseInt(installmentsSelect.value, 10);
+      if (!plan || !n) { installmentValueDiv.textContent = 'Parcela: R$ —'; return; }
+      const per = calcInstallment(plan.price_brl, monthlyRate, n);
+      installmentValueDiv.textContent = `Parcela: ${formatBRL(per)} (${n}x)`;
+    }
+
+    // Detecta bandeira pelo BIN
+    function detectBrand(num){
+      const n = num;
+      if (/^4/.test(n)) return 'Visa';
+      const two = parseInt(n.slice(0,2) || '0', 10);
+      const four = parseInt(n.slice(0,4) || '0', 10);
+      const six = n.slice(0,6);
+      if ((two >= 51 && two <= 55) || (four >= 2221 && four <= 2720)) return 'Master';
+      if (/^3[47]/.test(n)) return 'Amex';
+      if (/^(606282|3841)/.test(n)) return 'Hipercard';
+      if (/^3(0[0-5]|6|8)/.test(n)) return 'Diners';
+      if (/^(6011|65|64[4-9]|622)/.test(n)) return 'Discover';
+      const eloBins = [/^(4011)/, /^(431274)/, /^(438935)/, /^(457393)/, /^(504175)/, /^(627780)/, /^(636297)/, /^(636368)/];
+      if (eloBins.some(r=>r.test(n))) return 'Elo';
+      return '';
+    }
+
+    function formatCardNumber(num, brand){
+      const digits = num.replace(/\D/g, '');
+      if (brand === 'Amex') {
+        return digits.replace(/^(\d{1,4})(\d{1,6})?(\d{1,5})?$/, (m, a, b, c) => [a, b, c].filter(Boolean).join(' '));
+      }
+      return digits.replace(/(\d{1,4})(?=\d)/g, '$1 ').trim();
+    }
+
+    function updateBrandUI(brand){
+      if (brand) {
+        brandSelect.value = brand;
+        brandBadge.textContent = `Bandeira: ${brand}`;
+      } else {
+        brandBadge.textContent = '';
+      }
+      // Ajusta CVV: Amex 4, demais 3
+      if (brand === 'Amex') {
+        cvvInput.maxLength = 4;
+      } else {
+        cvvInput.maxLength = 3;
+      }
+    }
+
+    cardNumberInput.addEventListener('input', () => {
+      const raw = cardNumberInput.value.replace(/\D/g, '');
+      const brand = detectBrand(raw);
+      const formatted = formatCardNumber(cardNumberInput.value, brand);
+      cardNumberInput.value = formatted;
+      updateBrandUI(brand);
+    });
+
+    holderInput.addEventListener('input', () => {
+      holderInput.value = holderInput.value.toUpperCase();
+    });
+
+    cvvInput.addEventListener('input', () => {
+      cvvInput.value = cvvInput.value.replace(/\D/g, '');
+      if (cvvInput.maxLength) {
+        cvvInput.value = cvvInput.value.slice(0, cvvInput.maxLength);
+      }
+    });
+
+    expInput.addEventListener('input', () => {
+      let digits = expInput.value.replace(/\D/g, '');
+      if (digits.length > 6) digits = digits.slice(0, 6);
+      if (digits.length >= 3) {
+        expInput.value = `${digits.slice(0,2)}/${digits.slice(2)}`;
+      } else {
+        expInput.value = digits;
+      }
+    });
+
+    installmentsSelect.addEventListener('change', updateInstallmentInfo);
+    updateInstallmentInfo();
+  </script>
+{% endblock %}

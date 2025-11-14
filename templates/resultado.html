@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="hero-card">
+    {% if success %}
+      <h2 class="hero-title">Transação concluída</h2>
+      <p class="hero-sub">Pagamento aprovado e capturado com sucesso.</p>
+    {% else %}
+      <h2 class="hero-title">Falha na transação</h2>
+      <p class="hero-sub">{{ message }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    {% if success %}
+      {% if plan_label %}
+        <p><strong>Produto:</strong> {{ plan_label }}</p>
+      {% endif %}
+      {% if installments %}
+        <p><strong>Parcelas:</strong> {{ installments }}x de R$ {{ '%.2f'|format(per_installment) }}</p>
+      {% endif %}
+      {% if brand %}
+        <p><strong>Bandeira:</strong> {{ brand }}</p>
+      {% endif %}
+      {% if masked_card %}
+        <p><strong>Cartão:</strong> {{ masked_card }}</p>
+      {% endif %}
+      {% if order_id %}
+        <p><strong>Pedido:</strong> {{ order_id }}</p>
+      {% endif %}
+      {% if payment_id %}
+        <p><strong>Pagamento:</strong> {{ payment_id }}</p>
+      {% endif %}
+      {% if timestamp %}
+        <p><strong>Data:</strong> {{ timestamp }}</p>
+      {% endif %}
+      {% if status_code is defined %}
+        <p><strong>Status:</strong> {{ status_text }}</p>
+      {% endif %}
+      {% if return_code is defined and return_code %}
+        <p><strong>Return Code:</strong> {{ return_code }}</p>
+        {% if return_code_text %}
+          <p class="muted"><em>{{ return_code_text }}</em></p>
+        {% endif %}
+      {% endif %}
+
+      {% if auth_url %}
+        <div style="margin:10px 0;">
+          <a class="btn" href="{{ auth_url }}" target="_blank" rel="noopener">Autenticar 3DS</a>
+        </div>
+      {% endif %}
+
+      {% if status_code == 1 and payment_id and amount_cents %}
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
+          <form method="post" action="{{ url_for('capturar', payment_id=payment_id) }}">
+            <input type="hidden" name="amount_cents" value="{{ amount_cents }}">
+            <button class="btn btn-primary" type="submit">Capturar agora</button>
+          </form>
+          <form method="post" action="{{ url_for('cancelar', payment_id=payment_id) }}">
+            <input type="hidden" name="amount_cents" value="{{ amount_cents }}">
+            <button class="btn" type="submit">Cancelar</button>
+          </form>
+        </div>
+      {% endif %}
+
+      <hr>
+      <h3>Comprovante para WhatsApp</h3>
+      <p class="muted">Copie, baixe ou envie o texto pelo WhatsApp.</p>
+      <pre id="receipt-text" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border:1px solid #e9ecef; border-radius:6px;">{{ receipt_text }}</pre>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary" type="button" id="copy-btn">Copiar texto</button>
+        <a class="btn btn-primary" id="wa-btn" href="#" target="_blank" rel="noopener">Enviar via WhatsApp</a>
+        <button class="btn" type="button" id="download-btn">Baixar comprovante (.txt)</button>
+      </div>
+
+      <script>
+        (function(){
+          const receiptEl = document.getElementById('receipt-text');
+          const copyBtn = document.getElementById('copy-btn');
+          const waBtn = document.getElementById('wa-btn');
+          const downloadBtn = document.getElementById('download-btn');
+          const text = (receiptEl && receiptEl.textContent) ? receiptEl.textContent : '';
+
+          // WhatsApp share (abre chat com texto preenchido)
+          const waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
+          waBtn.setAttribute('href', waUrl);
+
+          // Copiar para área de transferência
+          copyBtn.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              copyBtn.textContent = 'Copiado!';
+              setTimeout(()=> copyBtn.textContent = 'Copiar texto', 2000);
+            } catch(err) {
+              alert('Não foi possível copiar o texto.');
+            }
+          });
+
+          // Baixar arquivo .txt
+          downloadBtn.addEventListener('click', () => {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `comprovante_${(window.orderId || '{{ order_id|default('pedido') }}')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          });
+        })();
+      </script>
+
+      <a class="btn btn-primary" href="{{ url_for('index') }}">Voltar</a>
+    {% else %}
+      <a class="btn btn-primary" href="{{ url_for('index') }}">Tentar novamente</a>
+    {% endif %}
+  </div>
+{% endblock %}

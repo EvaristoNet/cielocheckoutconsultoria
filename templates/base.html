@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Centro de Consultoria Educacional</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="nav">
+      <div class="container">
+        <div class="nav-row">
+          <div class="brand">Centro de Consultoria Educacional</div>
+        </div>
+      </div>
+    </div>
+    <div class="container hero">
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          <div class="alerts">
+            {% for category, message in messages %}
+              <div class="alert {{ 'alert-error' if category == 'error' else 'alert-info' }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+    <footer>
+      <div class="container">
+        <div class="footer-brand">CENTRO DE CONSULTORIA EDUCACIONAL</div>
+        <div class="footer-meta">@CENTRO DE CONSULTORIA EDUCACIONAL — Todos os direitos privados</div>
+        <div class="footer-cnpj">CNPJ: 54.863.268/0001-86</div>
+      </div>
+    </footer>
+  </body>
+</html>
