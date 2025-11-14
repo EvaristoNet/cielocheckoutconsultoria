@@ -1,3 +1,3 @@
 Flask>=2.2
 gunicorn>=20.1
-cieloApi3>=1.0
+cieloApi3==0.1.5
