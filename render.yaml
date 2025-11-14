@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: cceducacional-backend
+    env: python
+    region: oregon
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: CIELO_MERCHANT_ID
+        sync: false
+      - key: CIELO_MERCHANT_KEY
+        sync: false
+      - key: STATIC_BASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
